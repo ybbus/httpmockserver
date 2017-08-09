@@ -415,7 +415,7 @@ func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation
 
 	jsonBody, err := json.Marshal(object)
 	if err != nil {
-		exp.t.Fatal("response expectation failed: could not parse to json: %+v", object)
+		exp.t.Fatalf("response expectation failed: could not parse to json: %+v", object)
 	}
 
 	return exp.Body(jsonBody)
