@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"log"
+	"sync"
 )
 
 func New(port string, t *testing.T) *httpMock {
@@ -18,7 +19,13 @@ func New(port string, t *testing.T) *httpMock {
 	mock := new(httpMock)
 	mock.t = t
 
+	mutex := sync.Mutex{}
+
 	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		// only one request at a time
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		// check if we have expectations
 		if len(mock.expectations) == 0 {
 			t.Fatalf("Missing expectation for %v %v", r.Method, r.URL.Path)
