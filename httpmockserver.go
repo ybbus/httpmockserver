@@ -262,7 +262,7 @@ func (exp *expectation) BasicAuth(user, password string) RequestExpectation {
 func (exp *expectation) JsonBody(object interface{}) RequestExpectation {
 	data, err := json.Marshal(object)
 	if err != nil {
-		exp.t.Fatal("request validation failed: could not parse input body %+v", object)
+		exp.t.Fatalf("request validation failed: could not parse input body %+v", object)
 	}
 
 	return exp.Body(data)
