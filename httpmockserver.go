@@ -85,7 +85,7 @@ func New(port string, t *testing.T) *httpMock {
 	}
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + port,
 		Handler: handler,
 	}
 
