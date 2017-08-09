@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/ybbus/httpmockserver)](https://goreportcard.com/report/github.com/ybbus/httpmockserver)
+
 # HTTP Mock Server for golang
 HTTP Mock Server provides a way to easily mock externel http systems in your integration tests.
 Often the code under test access external resources that are not available during test or should not be used.
