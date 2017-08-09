@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"io/ioutil"
 	"encoding/json"
+	"log"
 )
 
 func New(port string, t *testing.T) *httpMock {
 	if port == "" {
-		port = "8080"
+		port = "8081"
 	}
 
 	mock := new(httpMock)
@@ -88,7 +89,9 @@ func New(port string, t *testing.T) *httpMock {
 		Handler: handler,
 	}
 
-	go server.ListenAndServe()
+	go func() {
+		log.Fatal(server.ListenAndServe())
+	}()
 
 	mock.server = server
 	return mock
