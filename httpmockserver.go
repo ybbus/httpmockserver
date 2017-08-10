@@ -16,7 +16,10 @@ import (
 
 func New(t *testing.T) *httpMock {
 	port := getPort()
+	return NewWithPort(port, t)
+}
 
+func NewWithPort(port string, t *testing.T) *httpMock {
 	mock := &httpMock{
 		Port: port,
 		Url:  "http://localhost:" + port,
