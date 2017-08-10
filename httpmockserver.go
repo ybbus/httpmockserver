@@ -1,14 +1,15 @@
 package httpmockserver
 
 import (
-	"net/http"
-	"fmt"
-	"testing"
 	"bytes"
-	"io/ioutil"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"regexp"
 	"sync"
+	"testing"
 )
 
 func New(port string, t *testing.T) *httpMock {
@@ -16,7 +17,7 @@ func New(port string, t *testing.T) *httpMock {
 		port = "8081"
 	}
 
-	mock := new(httpMock)
+	mock := &httpMock{}
 	mock.t = t
 
 	mutex := sync.Mutex{}
@@ -169,7 +170,7 @@ type mockResponse struct {
 
 /*
 REQUEST EXPECTATIONS
- */
+*/
 
 type RequestExpectation interface {
 	AnyRequest() RequestExpectation
@@ -177,6 +178,7 @@ type RequestExpectation interface {
 	Request(method string, path string) RequestExpectation
 	Method(method string) RequestExpectation
 	Path(path string) RequestExpectation
+	PathRegex(pathRegex string) RequestExpectation
 
 	GET() RequestExpectation
 	POST() RequestExpectation
@@ -217,6 +219,10 @@ func (exp *expectation) Method(method string) RequestExpectation {
 
 func (exp *expectation) Path(path string) RequestExpectation {
 	return exp.appendValidation(pathValidation(path), "Path: "+path)
+}
+
+func (exp *expectation) PathRegex(pathRegex string) RequestExpectation {
+	return exp.appendValidation(pathRegexValidation(pathRegex), "PathRegex: "+pathRegex)
 }
 
 func (exp *expectation) GET() RequestExpectation {
@@ -357,6 +363,17 @@ var (
 		}
 	}
 
+	pathRegexValidation = func(pathRegex string) requestValidationFunc {
+		regex := regexp.MustCompile(pathRegex)
+		return func(in *incomingRequest) error {
+			if !regex.MatchString(in.r.URL.Path) {
+				return fmt.Errorf("request validation failed: expected pathRegex %v but was %v", pathRegex, in.r.URL.Path)
+			}
+
+			return nil
+		}
+	}
+
 	headerValidation = func(key, value string) requestValidationFunc {
 		return func(in *incomingRequest) error {
 			if in.r.Header.Get(key) == "" {
@@ -384,7 +401,7 @@ var (
 
 /*
 RESPONSE EXPECTATIONS
- */
+*/
 
 type ResponseExpectation interface {
 	Header(key, value string) ResponseExpectation
