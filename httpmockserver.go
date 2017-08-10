@@ -6,18 +6,21 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"sync"
 	"testing"
 )
 
-func New(port string, t *testing.T) *httpMock {
-	if port == "" {
-		port = "8081"
-	}
+func New(t *testing.T) *httpMock {
+	port := getPort()
 
-	mock := &httpMock{}
+	mock := &httpMock{
+		Port: port,
+		Url:  "http://localhost:" + port,
+	}
 	mock.t = t
 
 	mutex := sync.Mutex{}
@@ -105,7 +108,23 @@ func New(port string, t *testing.T) *httpMock {
 	return mock
 }
 
+func getPort() string {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		panic(err)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	defer l.Close()
+	return strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
+}
+
 type httpMock struct {
+	Port         string
+	Url          string
 	every        []*expectation
 	one          []*expectation
 	expectations []*expectation

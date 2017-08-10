@@ -9,7 +9,8 @@ import (
 
 func TestStrange(t *testing.T) {
 
-	mock := New("8888", t)
+	mock := New(t)
+	url := mock.Url
 	defer mock.Shutdown()
 
 	mock.EVERY().GET().PathRegex("/hello.*")
@@ -20,8 +21,8 @@ func TestStrange(t *testing.T) {
 			mock.EXPECT().GET().Path(`/hello/4321`)
 			mock.EXPECT().GET().Path(`/hell/123`)
 
-			http.Get("http://localhost:8888/hello/4321")
-			http.Get("http://localhost:8888/hell/123")
+			http.Get(url + "/hello/4321")
+			http.Get(url + "/hell/123")
 		})
 	})
 
