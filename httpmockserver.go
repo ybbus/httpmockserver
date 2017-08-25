@@ -150,6 +150,7 @@ func (s *MockServer) EXPECT() RequestExpectation {
 	// default response
 	exp.response = &MockResponse{
 		Code: 404,
+		Headers: make(map[string]string),
 	}
 
 	s.expectations = append(s.expectations, exp)
