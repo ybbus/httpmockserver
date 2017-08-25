@@ -115,11 +115,11 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// build response
-	w.WriteHeader(exp.response.Code)
-
 	for key, value := range exp.response.Headers {
 		w.Header().Set(key, value)
 	}
+
+	w.WriteHeader(exp.response.Code)
 
 	if exp.response.Body != nil {
 		w.Write(exp.response.Body)
