@@ -11,11 +11,11 @@ import (
 	"net"
 )
 
-func New(t *testing.T) *MockServer {
-	return NewWithPort("0", t)
+func New(ssl bool, t *testing.T) *MockServer {
+	return NewWithPort("0", ssl, t)
 }
 
-func NewWithPort(port string, t *testing.T) *MockServer {
+func NewWithPort(port string, ssl bool, t *testing.T) *MockServer {
 
 	mockServer := &MockServer{
 		t: t,
@@ -34,7 +34,12 @@ func NewWithPort(port string, t *testing.T) *MockServer {
 		mockServer.server.Listener = l
 	}
 
-	mockServer.server.Start()
+	if (ssl) {
+		mockServer.server.StartTLS()
+	} else {
+
+		mockServer.server.Start()
+	}
 
 	return mockServer
 }
@@ -149,7 +154,7 @@ func (s *MockServer) EXPECT() RequestExpectation {
 
 	// default response
 	exp.response = &MockResponse{
-		Code: 404,
+		Code:    404,
 		Headers: make(map[string]string),
 	}
 
