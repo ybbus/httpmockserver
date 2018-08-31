@@ -2,8 +2,9 @@ package httpmockserver
 
 import (
 	"encoding/json"
-	"testing"
+	"math"
 	"net/http"
+	"testing"
 )
 
 type IncomingRequest struct {
@@ -13,6 +14,11 @@ type IncomingRequest struct {
 
 type RequestExpectation interface {
 	AnyRequest() RequestExpectation
+
+	AnyTimes() RequestExpectation
+	Times(n int) RequestExpectation
+	MinTimes(n int) RequestExpectation
+	MaxTimes(n int) RequestExpectation
 
 	Request(method string, path string) RequestExpectation
 	Method(method string) RequestExpectation
@@ -47,11 +53,42 @@ type RequestExpectation interface {
 
 type requestExpectation struct {
 	t                  *testing.T
+	count              int
+	min                int
+	max                int
 	requestValidations []*requestValidation
 	response           *MockResponse
 }
 
 func (exp *requestExpectation) AnyRequest() RequestExpectation {
+	return exp
+}
+
+func (exp *requestExpectation) Times(n int) RequestExpectation {
+	exp.min = n
+	exp.max = n
+	return exp
+}
+
+func (exp *requestExpectation) MinTimes(n int) RequestExpectation {
+	exp.min = n
+	if exp.max < exp.min {
+		exp.max = exp.min
+	}
+	return exp
+}
+
+func (exp *requestExpectation) MaxTimes(n int) RequestExpectation {
+	exp.max = n
+	if exp.min > exp.max {
+		exp.min = exp.max
+	}
+	return exp
+}
+
+func (exp *requestExpectation) AnyTimes() RequestExpectation {
+	exp.min = 0
+	exp.max = math.MaxInt32
 	return exp
 }
 
