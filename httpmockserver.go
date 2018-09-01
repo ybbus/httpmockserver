@@ -132,7 +132,16 @@ outerExp:
 
 	// if no default found log request and return default code
 	if matchedExpectation == nil {
-		s.t.Fatalf("Unexpected call:\nMethod: %v\nURL: %v\nHeaders: %v\nBody: %v", r.Method, r.URL.Path, r.Header, string(body))
+		s.t.Fatalf("Unexpected call:\nMethod: %v\nPath: %v\nHeaders: %v\nBody: %v", r.Method, r.URL.Path, r.Header, string(body))
+	}
+
+	if matchedExpectation.response == nil {
+		buf := bytes.Buffer{}
+		for _, val := range matchedExpectation.requestValidations {
+			buf.WriteString(fmt.Sprintf("----- %v\n", val.description))
+		}
+
+		s.t.Fatalf("Response not defined for expectation:\n%v", buf.String())
 	}
 
 	// build response
@@ -164,12 +173,6 @@ func (s *MockServer) EXPECT() RequestExpectation {
 		max:   1,
 	}
 
-	// TODO: default response
-	exp.response = &MockResponse{
-		Code:    404,
-		Headers: make(map[string]string),
-	}
-
 	s.expectations = append(s.expectations, exp)
 	return exp
 }
@@ -177,12 +180,6 @@ func (s *MockServer) EXPECT() RequestExpectation {
 func (s *MockServer) DEFAULT() RequestExpectation {
 	exp := &requestExpectation{
 		t: s.t,
-	}
-
-	// TODO: default response
-	exp.response = &MockResponse{
-		Code:    404,
-		Headers: make(map[string]string),
 	}
 
 	s.defaults = append(s.defaults, exp)
@@ -199,6 +196,11 @@ func (s *MockServer) Finish() {
 			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
 			for _, val := range exp.requestValidations {
 				buf.WriteString(fmt.Sprintf("----- %v\n", val.description))
+			}
+			if exp.count < exp.min {
+				buf.WriteString(fmt.Sprintf("----- only %v calls but at least %v were expected\n", exp.count, exp.min))
+			} else if exp.count > exp.max {
+				buf.WriteString(fmt.Sprintf("----- %v calls but at most %v were expected\n", exp.count, exp.max))
 			}
 
 		}

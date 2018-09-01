@@ -182,6 +182,11 @@ func (exp *requestExpectation) BodyFunc(bodyValidation func(body []byte) error) 
 }
 
 func (exp *requestExpectation) Response(code int) ResponseExpectation {
+	exp.response = &MockResponse{
+		Code:    code,
+		Headers: make(map[string]string),
+	}
+
 	responseExpectation := &responseExpectation{
 		t:    exp.t,
 		resp: exp.response,
