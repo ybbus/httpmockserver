@@ -3,19 +3,32 @@ package httpmockserver
 import (
 	"bytes"
 	"fmt"
-	"testing"
 	"io/ioutil"
-	"net/http"
-	"sync"
-	"net/http/httptest"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
 )
 
-func New(ssl bool, t *testing.T) *MockServer {
-	return NewWithPort("0", ssl, t)
+type Opts struct {
+	Port   string
+	UseSSL bool
 }
 
-func NewWithPort(port string, ssl bool, t *testing.T) *MockServer {
+func (o *Opts) validate() error {
+	return nil
+}
+
+func New(t *testing.T) *MockServer {
+	return NewWithOpts(t, Opts{})
+}
+
+func NewWithOpts(t *testing.T, opts Opts) *MockServer {
+	err := opts.validate()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mockServer := &MockServer{
 		t: t,
@@ -25,19 +38,18 @@ func NewWithPort(port string, ssl bool, t *testing.T) *MockServer {
 	mockServer.server = httptest.NewUnstartedServer(mockServer)
 	mockServer.server.Config.SetKeepAlivesEnabled(false)
 
-	if port != "0" {
+	if opts.Port != "0" && opts.Port != "" {
 		mockServer.server.Listener.Close()
-		l, err := net.Listen("tcp", "127.0.0.1:"+port)
+		l, err := net.Listen("tcp", "127.0.0.1:"+opts.Port)
 		if err != nil {
-			panic(fmt.Sprintf("httptest: failed to listen on 127.0.0.1:%v: %v", port, err))
+			t.Fatalf("httpmock: failed to listen on 127.0.0.1:%v: %v", opts.Port, err)
 		}
 		mockServer.server.Listener = l
 	}
 
-	if (ssl) {
+	if opts.UseSSL {
 		mockServer.server.StartTLS()
 	} else {
-
 		mockServer.server.Start()
 	}
 
@@ -52,28 +64,21 @@ type MockServer struct {
 	handlerMutex sync.Mutex
 
 	every        []*requestExpectation
-	one          []*requestExpectation
 	expectations []*requestExpectation
+	defaults     []*requestExpectation
 }
 
-func (s *MockServer) GetURL() string {
+func (s *MockServer) URL() string {
 	return s.server.URL
 }
 
-// TODO: should not be public
 func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// only one request at a time
 	s.handlerMutex.Lock()
 	defer s.handlerMutex.Unlock()
 
-	// check if we have expectations
-	if len(s.expectations) == 0 {
-		s.t.Fatalf("Missing expectation for %v %v", r.Method, r.URL.Path)
-	}
-
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		s.t.Fatal("request validation failed: could not read incoming request body")
+		s.t.Fatal("request validation failed: could not read incoming request body: ", err.Error())
 	}
 
 	incomingRequest := &IncomingRequest{
@@ -85,49 +90,60 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, every := range s.every {
 		for _, everyExp := range every.requestValidations {
 			if err := everyExp.validation(incomingRequest); err != nil {
-				s.t.Fatalf("EVERY expectation failed: %v", err.Error())
+				s.t.Errorf("expectation failed: %v", err)
 			}
 		}
 	}
 
-	// check ONEOF expectations
-	oneMatch := true
-	for _, one := range s.one {
-		oneMatch = true
-		for _, oneExp := range one.requestValidations {
-			if oneExp.validation(incomingRequest) != nil {
-				oneMatch = false
-				break
+	var matchedExpectation *requestExpectation
+	// check if call matches an expectation
+outerExp:
+	for _, exp := range s.expectations {
+		if exp.count >= exp.max {
+			continue
+		}
+
+		for _, reqVal := range exp.requestValidations {
+			if err := reqVal.validation(incomingRequest); err != nil {
+				continue outerExp
 			}
 		}
-		if oneMatch {
+
+		matchedExpectation = exp
+		matchedExpectation.count++
+		break
+	}
+
+	// if not matched any of the expectations
+	if matchedExpectation == nil {
+		// check if call matches a default
+	outerDefaults:
+		for _, exp := range s.defaults {
+			for _, reqVal := range exp.requestValidations {
+				if err := reqVal.validation(incomingRequest); err != nil {
+					continue outerDefaults
+				}
+			}
+
+			matchedExpectation = exp
 			break
 		}
 	}
 
-	if !oneMatch {
-		s.t.Fatalf("request validation failed: no match in ONEOF constraint list for %v %v", r.Method, r.URL.Path)
-	}
-
-	exp := s.expectations[0]
-	s.expectations = s.expectations[1:]
-
-	// check request validations
-	for _, reqVal := range exp.requestValidations {
-		if err := reqVal.validation(incomingRequest); err != nil {
-			s.t.Fatalf(err.Error())
-		}
+	// if no default found log request and return default code
+	if matchedExpectation == nil {
+		s.t.Fatalf("Unexpected call:\nMethod: %v\nURL: %v\nHeaders: %v\nBody: %v", r.Method, r.URL.Path, r.Header, string(body))
 	}
 
 	// build response
-	for key, value := range exp.response.Headers {
+	for key, value := range matchedExpectation.response.Headers {
 		w.Header().Set(key, value)
 	}
 
-	w.WriteHeader(exp.response.Code)
+	w.WriteHeader(matchedExpectation.response.Code)
 
-	if exp.response.Body != nil {
-		w.Write(exp.response.Body)
+	if matchedExpectation.response.Body != nil {
+		w.Write(matchedExpectation.response.Body)
 	}
 }
 
@@ -140,19 +156,15 @@ func (s *MockServer) EVERY() RequestExpectation {
 	return exp
 }
 
-func (s *MockServer) ONEOF() RequestExpectation {
-	exp := new(requestExpectation)
-	exp.t = s.t
-
-	s.one = append(s.one, exp)
-	return exp
-}
-
 func (s *MockServer) EXPECT() RequestExpectation {
-	exp := new(requestExpectation)
-	exp.t = s.t
+	exp := &requestExpectation{
+		t:     s.t,
+		count: 0,
+		min:   1,
+		max:   1,
+	}
 
-	// default response
+	// TODO: default response
 	exp.response = &MockResponse{
 		Code:    404,
 		Headers: make(map[string]string),
@@ -162,18 +174,38 @@ func (s *MockServer) EXPECT() RequestExpectation {
 	return exp
 }
 
+func (s *MockServer) DEFAULT() RequestExpectation {
+	exp := &requestExpectation{
+		t: s.t,
+	}
+
+	// TODO: default response
+	exp.response = &MockResponse{
+		Code:    404,
+		Headers: make(map[string]string),
+	}
+
+	s.defaults = append(s.defaults, exp)
+	return exp
+}
+
 func (s *MockServer) Finish() {
-	if len(s.expectations) != 0 {
-		var buf bytes.Buffer
+	var buf bytes.Buffer
 
-		for i, exp := range s.expectations {
+	unsatisfied := false
+	for i, exp := range s.expectations {
+		if exp.count < exp.min || exp.count > exp.max {
+			unsatisfied = true
 			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
-
 			for _, val := range exp.requestValidations {
 				buf.WriteString(fmt.Sprintf("----- %v\n", val.description))
 			}
+
 		}
-		s.t.Fatalf("\nexpectations not satisfied:\n%v", buf.String())
+	}
+
+	if unsatisfied {
+		s.t.Fatalf("\nexpectation(s) not satisfied:\n%v", buf.String())
 	}
 }
 
@@ -182,4 +214,11 @@ func (s *MockServer) Shutdown() {
 	defer s.handlerMutex.Unlock()
 
 	s.server.Close()
+}
+
+type request struct {
+	Method  string
+	Headers map[string][]string
+	URL     string
+	Body    []byte
 }
