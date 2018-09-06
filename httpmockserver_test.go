@@ -54,6 +54,24 @@ func TestMockServer_EXPECT(t *testing.T) {
 				check.Equal(201, res.StatusCode)
 			},
 		},
+		{
+			Description: "min max calls",
+			Run: func(mockServer *httpmockserver.MockServer, url string) {
+				mockServer.EXPECT().Get("/min").MinTimes(1).Response(200)
+				mockServer.EXPECT().Get("/max").MinTimes(2).Response(200)
+				mockServer.EXPECT().Get("/times").Times(3).Response(200)
+
+				Get(url+"/min", nil)
+
+				Get(url+"/max", nil)
+				Get(url+"/max", nil)
+				Get(url+"/max", nil)
+
+				Get(url+"/times", nil)
+				Get(url+"/times", nil)
+				Get(url+"/times", nil)
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -1,9 +1,10 @@
 package httpmockserver
 
 import (
-	"fmt"
 	"bytes"
+	"fmt"
 	"regexp"
+	"strings"
 )
 
 type RequestValidationFunc func(r *IncomingRequest) error
@@ -91,7 +92,7 @@ var (
 
 	methodValidation = func(method string) RequestValidationFunc {
 		return func(in *IncomingRequest) error {
-			if in.r.Method != method {
+			if strings.ToLower(in.r.Method) != strings.ToLower(method) {
 				return fmt.Errorf("request validation failed: expected method %v but was %v", method, in.r.Method)
 			}
 
