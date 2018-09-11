@@ -9,11 +9,15 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"io"
+	"crypto/tls"
 )
 
 type Opts struct {
 	Port   string
 	UseSSL bool
+	Cert   io.Reader
+	Key    io.Reader
 }
 
 func (o *Opts) validate() error {
@@ -48,6 +52,20 @@ func NewWithOpts(t *testing.T, opts Opts) *MockServer {
 	}
 
 	if opts.UseSSL {
+		if opts.Cert != nil && opts.Key != nil {
+			key, _ := ioutil.ReadAll(opts.Key)
+			cert, _ := ioutil.ReadAll(opts.Cert)
+
+			xCert, err := tls.X509KeyPair(cert, key)
+			if err != nil {
+				t.Fatal("could not load certificate: ", err.Error())
+			}
+
+			mockServer.server.TLS = &tls.Config{}
+			mockServer.server.TLS.NextProtos = []string{"http/1.1"}
+			mockServer.server.TLS.Certificates = []tls.Certificate{xCert}
+		}
+
 		mockServer.server.StartTLS()
 	} else {
 		mockServer.server.Start()
