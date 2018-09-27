@@ -62,7 +62,7 @@ func NewWithOpts(t *testing.T, opts Opts) *MockServer {
 			}
 
 			mockServer.server.TLS = &tls.Config{}
-			mockServer.server.TLS.NextProtos = []string{"http/1.1"}
+			mockServer.server.TLS.NextProtos = []string{"http/1.1","h2"}
 			mockServer.server.TLS.Certificates = []tls.Certificate{xCert}
 		}
 
