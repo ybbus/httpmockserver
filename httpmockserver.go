@@ -94,14 +94,14 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handlerMutex.Lock()
 	defer s.handlerMutex.Unlock()
 
+	err := r.ParseForm()
+	if err != nil {
+		s.t.Fatal("could not parse form parameters of http request")
+	}
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		s.t.Fatal("request validation failed: could not read incoming request body: ", err.Error())
-	}
-
-	err = r.ParseForm()
-	if err != nil {
-		s.t.Fatal("could not parse form parameters of http request")
 	}
 
 	incomingRequest := &IncomingRequest{
