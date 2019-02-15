@@ -8,8 +8,8 @@ import (
 )
 
 type IncomingRequest struct {
-	r    *http.Request
-	body []byte
+	R    *http.Request
+	Body []byte
 }
 
 type RequestExpectation interface {
@@ -37,6 +37,8 @@ type RequestExpectation interface {
 
 	Header(key, value string) RequestExpectation
 	Headers(map[string]string) RequestExpectation
+	FormParameter(key, value string) RequestExpectation
+	FormParameters(map[string]string) RequestExpectation
 
 	BasicAuth(user, password string) RequestExpectation
 
@@ -72,6 +74,9 @@ func (exp *requestExpectation) Times(n int) RequestExpectation {
 
 func (exp *requestExpectation) MinTimes(n int) RequestExpectation {
 	exp.min = n
+	if exp.max == 1 {
+		exp.max = math.MaxInt32
+	}
 	if exp.max < exp.min {
 		exp.max = exp.min
 	}
@@ -148,6 +153,17 @@ func (exp *requestExpectation) Header(key, value string) RequestExpectation {
 func (exp *requestExpectation) Headers(headers map[string]string) RequestExpectation {
 	for key, value := range headers {
 		exp.Header(key, value)
+	}
+	return exp
+}
+
+func (exp *requestExpectation) FormParameter(key, value string) RequestExpectation {
+	return exp.appendValidation(formParameterValidation(key, value), "FormParameter: "+key+":"+value)
+}
+
+func (exp *requestExpectation) FormParameters(formParameters map[string]string) RequestExpectation {
+	for key, value := range formParameters {
+		exp.FormParameter(key, value)
 	}
 	return exp
 }

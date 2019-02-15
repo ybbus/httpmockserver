@@ -2,15 +2,15 @@ package httpmockserver
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"io"
-	"crypto/tls"
 )
 
 type Opts struct {
@@ -62,7 +62,7 @@ func NewWithOpts(t *testing.T, opts Opts) *MockServer {
 			}
 
 			mockServer.server.TLS = &tls.Config{}
-			mockServer.server.TLS.NextProtos = []string{"http/1.1","h2"}
+			mockServer.server.TLS.NextProtos = []string{"http/1.1", "h2"}
 			mockServer.server.TLS.Certificates = []tls.Certificate{xCert}
 		}
 
@@ -99,9 +99,14 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.t.Fatal("request validation failed: could not read incoming request body: ", err.Error())
 	}
 
+	err = r.ParseForm()
+	if err != nil {
+		s.t.Fatal("could not parse form parameters of http request")
+	}
+
 	incomingRequest := &IncomingRequest{
-		r:    r,
-		body: body,
+		R:    r,
+		Body: body,
 	}
 
 	// check EVERY expectations
