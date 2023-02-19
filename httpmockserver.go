@@ -5,79 +5,128 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync"
-	"testing"
 )
 
+// Opts is used to configure the mock server
+// it has reasonable defaults
 type Opts struct {
-	Port   string
+	// Port is the port the mock server will listen on (default: random port)
+	Port string
+	// UseSSL is used to enable SSL (default: false)
 	UseSSL bool
-	Cert   io.Reader
-	Key    io.Reader
+	// Cert is the certificate used for SSL
+	Cert io.Reader
+	// Key is the key used for SSL
+	Key io.Reader
 }
 
 func (o *Opts) validate() error {
+	if o.UseSSL && (o.Cert == nil || o.Key == nil) {
+		return fmt.Errorf("UseSSL is set to true but no certificate or key is provided")
+	}
+	if o.Port == "" {
+		o.Port = "0"
+	}
+	// check if port can be parsed to an integer atoi
+	i, err := strconv.Atoi(o.Port)
+	if err != nil {
+		return fmt.Errorf("port is not a valid integer")
+	}
+	if i < 0 || i > 65535 {
+		return fmt.Errorf("port is not a valid port number")
+	}
 	return nil
 }
 
-func New(t *testing.T) *MockServer {
+type MockServer interface {
+	// BaseURL returns the base url of the mock server (default: http://127.0.0.1:<random_port>)
+	BaseURL() string
+	// ServeHTTP provides direct access to the http handler, normally this is not required
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	// EVERY returns a RequestExpectation that will match on any call
+	// (e.g. all requests should have a specific header, or all requests use GET)
+	EVERY() RequestExpectation
+	// EXPECT returns a RequestExpectation that can be used to create expectations
+	// the default number of calls is expected to be exactly one
+	// this can be changed by calling a method like: Times, MinTimes, MaxTimes, etc.
+	EXPECT() RequestExpectation
+	// DEFAULT returns a RequestExpectation that will be executed if no other expectation matches
+	DEFAULT() RequestExpectation
+	// AssertExpectations should be called to check if all expectations have been met
+	AssertExpectations()
+	// Shutdown should be called to stop the mock server (should be deferred at the beginning of the test function)
+	Shutdown()
+}
+
+// New creates a new mock server running on http://127.0.0.1:<random_port>
+func New(t T) MockServer {
 	return NewWithOpts(t, Opts{})
 }
 
-func NewWithOpts(t *testing.T, opts Opts) *MockServer {
+type T interface {
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
+// NewWithOpts can be used to create a mock server with custom options
+func NewWithOpts(t T, opts Opts) MockServer {
 	err := opts.validate()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("invalid options: %v", err)
+		return nil
 	}
 
-	mockServer := &MockServer{
+	mockServerInst := &mockServer{
 		t: t,
 	}
 
 	// if port is not set to random (0) close the listener and change the port
-	mockServer.server = httptest.NewUnstartedServer(mockServer)
-	mockServer.server.Config.SetKeepAlivesEnabled(false)
+	mockServerInst.server = httptest.NewUnstartedServer(mockServerInst)
+	mockServerInst.server.Config.SetKeepAlivesEnabled(false)
 
-	if opts.Port != "0" && opts.Port != "" {
-		mockServer.server.Listener.Close()
-		l, err := net.Listen("tcp", "127.0.0.1:"+opts.Port)
+	if opts.Port != "0" {
+		mockServerInst.server.Listener.Close()
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%s", opts.Port))
 		if err != nil {
 			t.Fatalf("httpmock: failed to listen on 127.0.0.1:%v: %v", opts.Port, err)
 		}
-		mockServer.server.Listener = l
+		mockServerInst.server.Listener = l
 	}
 
 	if opts.UseSSL {
 		if opts.Cert != nil && opts.Key != nil {
-			key, _ := ioutil.ReadAll(opts.Key)
-			cert, _ := ioutil.ReadAll(opts.Cert)
+			key, _ := io.ReadAll(opts.Key)
+			cert, _ := io.ReadAll(opts.Cert)
 
 			xCert, err := tls.X509KeyPair(cert, key)
 			if err != nil {
 				t.Fatal("could not load certificate: ", err.Error())
 			}
 
-			mockServer.server.TLS = &tls.Config{}
-			mockServer.server.TLS.NextProtos = []string{"http/1.1", "h2"}
-			mockServer.server.TLS.Certificates = []tls.Certificate{xCert}
+			mockServerInst.server.TLS = &tls.Config{}
+			mockServerInst.server.TLS.NextProtos = []string{"http/1.1", "h2"}
+			mockServerInst.server.TLS.Certificates = []tls.Certificate{xCert}
 		}
 
-		mockServer.server.StartTLS()
+		mockServerInst.server.StartTLS()
 	} else {
-		mockServer.server.Start()
+		mockServerInst.server.Start()
 	}
 
-	return mockServer
+	return mockServerInst
 }
 
-type MockServer struct {
-	server *httptest.Server
+type mockServer struct {
+	server        *httptest.Server
+	finisheCalled bool
 
-	t *testing.T
+	t T
 
 	handlerMutex sync.Mutex
 
@@ -86,11 +135,11 @@ type MockServer struct {
 	defaults     []*requestExpectation
 }
 
-func (s *MockServer) URL() string {
+func (s *mockServer) BaseURL() string {
 	return s.server.URL
 }
 
-func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handlerMutex.Lock()
 	defer s.handlerMutex.Unlock()
 
@@ -99,7 +148,7 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.t.Fatal("could not parse form parameters of http request")
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.t.Fatal("request validation failed: could not read incoming request body: ", err.Error())
 	}
@@ -109,7 +158,7 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Body: body,
 	}
 
-	// check EVERY expectations
+	// check EVERY expectation
 	for _, every := range s.every {
 		for _, everyExp := range every.requestValidations {
 			if err := everyExp.validation(incomingRequest); err != nil {
@@ -122,10 +171,6 @@ func (s *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// check if call matches an expectation
 outerExp:
 	for _, exp := range s.expectations {
-		if exp.count >= exp.max {
-			continue
-		}
-
 		for _, reqVal := range exp.requestValidations {
 			if err := reqVal.validation(incomingRequest); err != nil {
 				continue outerExp
@@ -156,6 +201,7 @@ outerExp:
 	// if no default found log request and return default code
 	if matchedExpectation == nil {
 		s.t.Fatalf("Unexpected call:\nMethod: %v\nPath: %v\nHeaders: %v\nBody: %v", r.Method, r.URL.Path, r.Header, string(body))
+		return
 	}
 
 	if matchedExpectation.response == nil {
@@ -165,9 +211,20 @@ outerExp:
 		}
 
 		s.t.Fatalf("Response not defined for expectation:\n%v", buf.String())
+		return
 	}
 
 	// build response
+
+	// write headers of EVERY expectation
+	for _, every := range s.every {
+		if every.response != nil {
+			for key, value := range every.response.Headers {
+				w.Header().Set(key, value)
+			}
+		}
+	}
+
 	for key, value := range matchedExpectation.response.Headers {
 		w.Header().Set(key, value)
 	}
@@ -179,16 +236,16 @@ outerExp:
 	}
 }
 
-// TODO: response expectation makes no sense here
-func (s *MockServer) EVERY() RequestExpectation {
+func (s *mockServer) EVERY() RequestExpectation {
 	exp := new(requestExpectation)
 	exp.t = s.t
+	exp.every = true
 
 	s.every = append(s.every, exp)
 	return exp
 }
 
-func (s *MockServer) EXPECT() RequestExpectation {
+func (s *mockServer) EXPECT() RequestExpectation {
 	exp := &requestExpectation{
 		t:     s.t,
 		count: 0,
@@ -200,20 +257,27 @@ func (s *MockServer) EXPECT() RequestExpectation {
 	return exp
 }
 
-func (s *MockServer) DEFAULT() RequestExpectation {
+func (s *mockServer) DEFAULT() RequestExpectation {
 	exp := &requestExpectation{
-		t: s.t,
+		t:          s.t,
+		defaultExp: true,
 	}
 
 	s.defaults = append(s.defaults, exp)
 	return exp
 }
 
-func (s *MockServer) Finish() {
+func (s *mockServer) AssertExpectations() {
+	s.finisheCalled = true
 	var buf bytes.Buffer
 
 	unsatisfied := false
 	for i, exp := range s.expectations {
+		if len(exp.requestValidations) == 0 {
+			unsatisfied = true
+			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
+			buf.WriteString("----- no request validation defined\n")
+		}
 		if exp.count < exp.min || exp.count > exp.max {
 			unsatisfied = true
 			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
@@ -231,19 +295,17 @@ func (s *MockServer) Finish() {
 
 	if unsatisfied {
 		s.t.Fatalf("\nexpectation(s) not satisfied:\n%v", buf.String())
+		return
 	}
 }
 
-func (s *MockServer) Shutdown() {
+func (s *mockServer) Shutdown() {
+	if !s.finisheCalled {
+		s.t.Fatalf("AssertExpectations() was not called, no expectations were checked")
+		return
+	}
 	s.handlerMutex.Lock()
 	defer s.handlerMutex.Unlock()
 
 	s.server.Close()
-}
-
-type request struct {
-	Method  string
-	Headers map[string][]string
-	URL     string
-	Body    []byte
 }

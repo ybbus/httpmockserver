@@ -1,7 +1,6 @@
 package httpmockserver
 
 import (
-	"testing"
 	"encoding/json"
 )
 
@@ -11,6 +10,9 @@ type MockResponse struct {
 	Body    []byte
 }
 
+// ResponseExpectation is a builder for a MockResponse
+// you may set Headers, Body, and Code on the response
+// this response is returned to the caller when the corresponding request is matched
 type ResponseExpectation interface {
 	Header(key, value string) ResponseExpectation
 	Headers(headers map[string]string) ResponseExpectation
@@ -21,14 +23,16 @@ type ResponseExpectation interface {
 
 type responseExpectation struct {
 	resp *MockResponse
-	t    *testing.T
+	t    T
 }
 
+// Header sets a header on the response
 func (exp *responseExpectation) Header(key, value string) ResponseExpectation {
 	exp.resp.Headers[key] = value
 	return exp
 }
 
+// Headers sets multiple headers on the response
 func (exp *responseExpectation) Headers(headers map[string]string) ResponseExpectation {
 	for key, value := range headers {
 		exp.resp.Headers[key] = value
@@ -36,13 +40,16 @@ func (exp *responseExpectation) Headers(headers map[string]string) ResponseExpec
 	return exp
 }
 
+// StringBody sets the body of the response to the given string (e.g. "Hello World" or `{"foo":"bar"}`)
 func (exp *responseExpectation) StringBody(body string) ResponseExpectation {
 	return exp.Body([]byte(body))
 }
 
+// JsonBody sets the body of the response to the given object (e.g. `{"foo":"bar"}` or map[string]string{"foo":"bar"})
+// you may provide a go object or a valid json string
 func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation {
 	if object == nil {
-		exp.Body(nil)
+		return exp.Body(nil)
 	}
 
 	jsonBody, err := json.Marshal(object)
@@ -53,6 +60,7 @@ func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation
 	return exp.Body(jsonBody)
 }
 
+// Body sets the body of the response to the given byte array (e.g. []byte("Hello World") or []byte(`{"foo":"bar"}`))
 func (exp *responseExpectation) Body(data []byte) ResponseExpectation {
 	exp.resp.Body = data
 	return exp
