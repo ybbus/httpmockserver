@@ -53,6 +53,9 @@ type RequestExpectation interface {
 	// PUT expects a given request with a PUT method
 	// use if no path should be matched (otherwise use Put(path))
 	PUT() RequestExpectation
+	// PATCH expects a given request with a PATCH method
+	// use if no path should be matched (otherwise use Patch(path))
+	PATCH() RequestExpectation
 	// DELETE expects a given request with a DELETE method
 	// use if no path should be matched (otherwise use Delete(path))
 	DELETE() RequestExpectation
@@ -72,6 +75,10 @@ type RequestExpectation interface {
 	Put(path string) RequestExpectation
 	// PutMatches expects a given request with a PUT method and a path matching a regex (e.g. `^/foo/bar/\d+$`)
 	PutMatches(pathRegex string) RequestExpectation
+	// Patch expects a given request with a PATCH method and a specific path (e.g. /foo/bar)
+	Patch(path string) RequestExpectation
+	// PatchMatches expects a given request with a PATCH method and a path matching a regex (e.g. `^/foo/bar/\d+$`)
+	PatchMatches(pathRegex string) RequestExpectation
 	// Delete expects a given request with a DELETE method and a specific path (e.g. /foo/bar)
 	Delete(path string) RequestExpectation
 	// DeleteMatches expects a given request with a DELETE method and a path matching a regex (e.g. `^/foo/bar/\d+$`)
@@ -249,6 +256,10 @@ func (exp *requestExpectation) PUT() RequestExpectation {
 	return exp.appendValidation(methodValidation("PUT"), "PUT")
 }
 
+func (exp *requestExpectation) PATCH() RequestExpectation {
+	return exp.appendValidation(methodValidation("PATCH"), "PATCH")
+}
+
 func (exp *requestExpectation) DELETE() RequestExpectation {
 	return exp.appendValidation(methodValidation("DELETE"), "DELETE")
 }
@@ -279,6 +290,14 @@ func (exp *requestExpectation) Put(path string) RequestExpectation {
 
 func (exp *requestExpectation) PutMatches(regex string) RequestExpectation {
 	return exp.RequestMatches("PUT", regex)
+}
+
+func (exp *requestExpectation) Patch(path string) RequestExpectation {
+	return exp.Request("PATCH", path)
+}
+
+func (exp *requestExpectation) PatchMatches(regex string) RequestExpectation {
+	return exp.RequestMatches("PATCH", regex)
 }
 
 func (exp *requestExpectation) Delete(path string) RequestExpectation {

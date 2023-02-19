@@ -215,16 +215,6 @@ outerExp:
 	}
 
 	// build response
-
-	// write headers of EVERY expectation
-	for _, every := range s.every {
-		if every.response != nil {
-			for key, value := range every.response.Headers {
-				w.Header().Set(key, value)
-			}
-		}
-	}
-
 	for key, value := range matchedExpectation.response.Headers {
 		w.Header().Set(key, value)
 	}
