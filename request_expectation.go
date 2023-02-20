@@ -448,6 +448,6 @@ func (exp *requestExpectation) Response(code int) ResponseExpectation {
 }
 
 func (exp *requestExpectation) appendValidation(validation RequestValidationFunc, description string) *requestExpectation {
-	exp.requestValidations = append(exp.requestValidations, &requestValidation{validation, description})
+	exp.requestValidations = append(exp.requestValidations, &requestValidation{validation, description, false})
 	return exp
 }

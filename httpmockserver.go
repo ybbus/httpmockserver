@@ -175,6 +175,7 @@ outerExp:
 			if err := reqVal.validation(incomingRequest); err != nil {
 				continue outerExp
 			}
+			reqVal.satisfied = true
 		}
 
 		matchedExpectation = exp
@@ -263,6 +264,7 @@ func (s *mockServer) AssertExpectations() {
 
 	unsatisfied := false
 	for i, exp := range s.expectations {
+		showFirstUnmatched := false
 		if len(exp.requestValidations) == 0 {
 			unsatisfied = true
 			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
@@ -272,7 +274,12 @@ func (s *mockServer) AssertExpectations() {
 			unsatisfied = true
 			buf.WriteString(fmt.Sprintf("%v. Expectation\n", i+1))
 			for _, val := range exp.requestValidations {
-				buf.WriteString(fmt.Sprintf("----- %v\n", val.description))
+				buf.WriteString(fmt.Sprintf("----- %v", val.description))
+				if !val.satisfied && !showFirstUnmatched {
+					showFirstUnmatched = true
+					buf.WriteString(" (never matched)")
+				}
+				buf.WriteString("\n")
 			}
 			if exp.count < exp.min {
 				buf.WriteString(fmt.Sprintf("----- only %v calls but at least %v were expected\n", exp.count, exp.min))

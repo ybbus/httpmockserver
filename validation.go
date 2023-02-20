@@ -16,6 +16,7 @@ type RequestValidationFunc func(r *IncomingRequest) error
 type requestValidation struct {
 	validation  RequestValidationFunc
 	description string
+	satisfied   bool
 }
 
 func (val *requestValidation) String() string {

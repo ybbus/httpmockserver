@@ -252,6 +252,26 @@ func TestMockServer_EXPECT(t *testing.T) {
 		mockServer.AssertExpectations()
 		tMock.AssertExpectations(t)
 	})
+
+	t.Run("EXPECT show potential unsatisfied expectation", func(t *testing.T) {
+		tMock := new(TMock)
+		// called when request did not match anything
+		tMock.On("Fatalf", mock.Anything, mock.Anything).Once()
+
+		// called for unmet expectations at the end of the test
+		tMock.On("Fatalf", mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
+			check.Contains(args[1].([]interface{})[0], "Header: Test:123 (never matched)")
+		})
+
+		mockServer := httpmockserver.New(tMock)
+		defer mockServer.Shutdown()
+
+		mockServer.EXPECT().GET().Path("/test").Header("Test", "123").Body([]byte("Hello World")).Response(200)
+
+		get(mockServer.BaseURL(), "/test", nil)
+
+		mockServer.AssertExpectations()
+	})
 }
 
 func TestMockServer_PATHS(t *testing.T) {
