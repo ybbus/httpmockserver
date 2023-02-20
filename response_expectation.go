@@ -67,6 +67,25 @@ func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation
 		return exp.Body(nil)
 	}
 
+	switch t := object.(type) {
+	case []byte:
+		var object interface{}
+		err := json.Unmarshal(t, &object)
+		if err != nil {
+			exp.t.Fatalf("response expectation failed: could not parse to json: %+v", object)
+		}
+		resData, _ := json.Marshal(object)
+		return exp.Body(resData)
+	case string:
+		var object interface{}
+		err := json.Unmarshal([]byte(t), &object)
+		if err != nil {
+			exp.t.Fatalf("response expectation failed: could not parse to json: %+v", object)
+		}
+		resData, _ := json.Marshal(object)
+		return exp.Body(resData)
+	}
+
 	jsonBody, err := json.Marshal(object)
 	if err != nil {
 		exp.t.Fatalf("response expectation failed: could not parse to json: %+v", object)
