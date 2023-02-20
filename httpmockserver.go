@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -75,8 +76,29 @@ type T interface {
 	Errorf(format string, args ...interface{})
 }
 
+type LoggerT struct {
+}
+
+func (l *LoggerT) Helper() {}
+
+func (l *LoggerT) Fatal(args ...interface{}) {
+	log.Fatal(args...)
+}
+
+func (l *LoggerT) Fatalf(format string, args ...interface{}) {
+	log.Fatalf(format, args...)
+}
+
+func (l *LoggerT) Errorf(format string, args ...interface{}) {
+	log.Printf(format, args...)
+}
+
 // NewWithOpts can be used to create a mock server with custom options
 func NewWithOpts(t T, opts Opts) MockServer {
+	if t == nil {
+		t = &LoggerT{}
+	}
+
 	t.Helper()
 	err := opts.validate()
 	if err != nil {
