@@ -922,3 +922,6 @@ func (t *TMock) Fatalf(format string, args ...interface{}) {
 func (t *TMock) Errorf(format string, args ...interface{}) {
 	t.Called(format, args)
 }
+
+func (t *TMock) Helper() {
+}

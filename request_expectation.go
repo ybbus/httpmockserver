@@ -422,7 +422,7 @@ func (exp *requestExpectation) Custom(validation RequestValidationFunc, descript
 }
 
 func (exp *requestExpectation) Response(code int) ResponseExpectation {
-
+	exp.t.Helper()
 	if exp.every {
 		exp.t.Fatalf("Every is used to check conditions on every request, therefore it cannot be used with Response()")
 		return nil

@@ -48,6 +48,7 @@ func (exp *responseExpectation) StringBody(body string) ResponseExpectation {
 // JsonBody sets the body of the response to the given object (e.g. `{"foo":"bar"}` or map[string]string{"foo":"bar"})
 // you may provide a go object or a valid json string
 func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation {
+	exp.t.Helper()
 	if object == nil {
 		return exp.Body(nil)
 	}

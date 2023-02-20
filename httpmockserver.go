@@ -69,6 +69,7 @@ func New(t T) MockServer {
 }
 
 type T interface {
+	Helper()
 	Fatal(args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
@@ -76,6 +77,7 @@ type T interface {
 
 // NewWithOpts can be used to create a mock server with custom options
 func NewWithOpts(t T, opts Opts) MockServer {
+	t.Helper()
 	err := opts.validate()
 	if err != nil {
 		t.Fatalf("invalid options: %v", err)
@@ -140,6 +142,7 @@ func (s *mockServer) BaseURL() string {
 }
 
 func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.t.Helper()
 	s.handlerMutex.Lock()
 	defer s.handlerMutex.Unlock()
 
@@ -259,6 +262,7 @@ func (s *mockServer) DEFAULT() RequestExpectation {
 }
 
 func (s *mockServer) AssertExpectations() {
+	s.t.Helper()
 	s.finisheCalled = true
 	var buf bytes.Buffer
 
