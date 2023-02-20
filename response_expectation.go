@@ -14,6 +14,7 @@ type MockResponse struct {
 // you may set Headers, Body, and Code on the response
 // this response is returned to the caller when the corresponding request is matched
 type ResponseExpectation interface {
+	ContentType(contentType string) ResponseExpectation
 	Header(key, value string) ResponseExpectation
 	Headers(headers map[string]string) ResponseExpectation
 	StringBody(body string) ResponseExpectation
@@ -24,6 +25,12 @@ type ResponseExpectation interface {
 type responseExpectation struct {
 	resp *MockResponse
 	t    T
+}
+
+// ContentType sets the content type header on the response
+func (exp *responseExpectation) ContentType(contentType string) ResponseExpectation {
+	exp.resp.Headers["Content-Type"] = contentType
+	return exp
 }
 
 // Header sets a header on the response
@@ -47,8 +54,15 @@ func (exp *responseExpectation) StringBody(body string) ResponseExpectation {
 
 // JsonBody sets the body of the response to the given object (e.g. `{"foo":"bar"}` or map[string]string{"foo":"bar"})
 // you may provide a go object or a valid json string
+// automatically sets the content type to application/json if ContentType is not set yet
 func (exp *responseExpectation) JsonBody(object interface{}) ResponseExpectation {
 	exp.t.Helper()
+
+	// check if ContentType is set, if not set it to application/json
+	if _, ok := exp.resp.Headers["Content-Type"]; !ok {
+		exp.resp.Headers["Content-Type"] = "application/json"
+	}
+
 	if object == nil {
 		return exp.Body(nil)
 	}
