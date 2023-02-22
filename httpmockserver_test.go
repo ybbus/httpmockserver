@@ -712,7 +712,7 @@ func TestMockServer_Body(t *testing.T) {
 		mockServer.AssertExpectations()
 	})
 
-	t.Run("should match JSON path", func(t *testing.T) {
+	t.Run("should check JSON path contains string", func(t *testing.T) {
 		tMock := new(TMock)
 
 		mockServer := httpmockserver.New(tMock)
@@ -729,6 +729,46 @@ func TestMockServer_Body(t *testing.T) {
 		check.Equal(201, res.status)
 
 		res = post(mockServer.BaseURL(), "/test", jsonBodyWrong, nil)
+		check.Equal(400, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", jsonBodyInvalid, nil)
+		check.Equal(400, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", "", nil)
+		check.Equal(400, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", "nil", nil)
+		check.Equal(400, res.status)
+
+		mockServer.AssertExpectations()
+	})
+
+	t.Run("should check JSON path matches string", func(t *testing.T) {
+		tMock := new(TMock)
+		tMock.On("Fatalf", mock.Anything, mock.Anything)
+
+		mockServer := httpmockserver.New(tMock)
+		defer mockServer.Shutdown()
+
+		mockServer.EXPECT().Post("/test").JSONPathMatches(`$.person.age`, `^\d\d\d$`).Times(1).Response(201)
+		mockServer.DEFAULT().Response(400)
+
+		jsonBodyStr := `{"person": {"age": "123", "name": "John"}}`
+		jsonBodyNoStr := `{"person": {"age": 123, "name": "John"}}`
+		jsonBodyNoMatch := `{"person": {"age": 1234, "name": "John"}}`
+		jsonBodyMissingPath := `{age": 123, "name": "John", "extra": "field"}`
+		jsonBodyInvalid := `{"age": 12, "name": "John"`
+
+		res := post(mockServer.BaseURL(), "/test", jsonBodyStr, nil)
+		check.Equal(201, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", jsonBodyNoStr, nil)
+		check.Equal(201, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", jsonBodyNoMatch, nil)
+		check.Equal(400, res.status)
+
+		res = post(mockServer.BaseURL(), "/test", jsonBodyMissingPath, nil)
 		check.Equal(400, res.status)
 
 		res = post(mockServer.BaseURL(), "/test", jsonBodyInvalid, nil)
@@ -818,9 +858,10 @@ func TestMockServer_ResponseExpectation(t *testing.T) {
 
 		mockServer.EXPECT().Get("/test").Times(1).Response(201).Body([]byte("Hello World!")).Header("Content-Type", "text/plain")
 		mockServer.EXPECT().Get("/test2").Times(1).Response(202).StringBody("Hello World!").Headers(Headers{"Content-Type": "text/plain"})
-		mockServer.EXPECT().Get("/test3").Times(1).Response(203).JsonBody(map[string]string{"hello": "world"})
+		mockServer.EXPECT().Get("/test3").Times(1).Response(203).ContentType("text/plain").JsonBody(map[string]string{"hello": "world"})
 		mockServer.EXPECT().Get("/test4").Times(1).Response(204).JsonBody(nil)
-		mockServer.EXPECT().Get("/test4").Times(1).Response(205).JsonBody("wrong json body")
+		mockServer.EXPECT().Get("/test5").Times(1).Response(205).JsonBody([]byte(`{"hello":"world"}`))
+		mockServer.EXPECT().Get("/test6").Times(1).Response(206).JsonBody("wrong json body")
 		mockServer.DEFAULT().Response(400)
 
 		res := get(mockServer.BaseURL(), "/test", nil)
@@ -834,13 +875,57 @@ func TestMockServer_ResponseExpectation(t *testing.T) {
 
 		res = get(mockServer.BaseURL(), "/test3", nil)
 		check.Equal(203, res.status)
+		check.Equal("text/plain", res.header["Content-Type"][0])
 		check.Equal(`{"hello":"world"}`, res.body)
 
 		res = get(mockServer.BaseURL(), "/test4", nil)
 		check.Equal(204, res.status)
 		check.Equal("", res.body)
 
+		res = get(mockServer.BaseURL(), "/test5", nil)
+		check.Equal(205, res.status)
+		// content-type is application/json
+		check.Equal("application/json", res.header["Content-Type"][0])
+		check.Equal(`{"hello":"world"}`, res.body)
+
 		mockServer.AssertExpectations()
+	})
+}
+
+func TestMockServer_AssertExpectations(t *testing.T) {
+	check := assert.New(t)
+
+	tMock := new(TMock)
+	mockServer := httpmockserver.New(tMock)
+	mockServer.DEFAULT().Response(400)
+	mockServer.EVERY().Header("Content-Type", "application/json")
+	defer mockServer.Shutdown()
+
+	t.Run("should have a get anytimes expectation", func(t *testing.T) {
+		mockServer.EXPECT().Get("/test").AnyTimes().Response(201)
+
+		res := get(mockServer.BaseURL(), "/test", map[string]string{"Content-Type": "application/json"})
+		check.Equal(201, res.status)
+
+		mockServer.AssertExpectations()
+	})
+
+	t.Run("should trigger default expectation after AssertExpectations", func(t *testing.T) {
+
+		res := get(mockServer.BaseURL(), "/test", map[string]string{"Content-Type": "application/json"})
+		check.Equal(400, res.status)
+
+		mockServer.AssertExpectations()
+	})
+
+	t.Run("should still use every expectation", func(t *testing.T) {
+		tMock.On("Errorf", mock.Anything, mock.Anything)
+
+		res := get(mockServer.BaseURL(), "/test", nil)
+		check.Equal(400, res.status)
+
+		mockServer.AssertExpectations()
+		tMock.AssertExpectations(t)
 	})
 }
 

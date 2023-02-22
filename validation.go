@@ -127,6 +127,34 @@ var (
 		}
 	}
 
+	jsonPathMatchesValidation = func(jsPath string, regex string) RequestValidationFunc {
+		return func(in *IncomingRequest) error {
+			var jsBodyObject map[string]interface{}
+			err := json.Unmarshal(in.Body, &jsBodyObject)
+			if err != nil {
+				return fmt.Errorf("request validation failed: could not parse json body %+v: %v", in.Body, err)
+			}
+
+			res, err := jsonpath.JsonPathLookup(jsBodyObject, jsPath)
+			if err != nil {
+				return fmt.Errorf("request validation failed: could not find json path %v in body %+v: %v", jsPath, in.Body, err)
+			}
+
+			// stringify the result
+			var str = ""
+			str, ok := res.(string)
+			if !ok {
+				str = fmt.Sprintf("%v", res)
+			}
+
+			if regexp.MustCompile(regex).MatchString(str) {
+				return nil
+			}
+
+			return fmt.Errorf("request validation failed: json path %v should match %v but was %+v", jsPath, regex, res)
+		}
+	}
+
 	basicAuthValidation = func(user, password string) RequestValidationFunc {
 		return func(in *IncomingRequest) error {
 			_user, _password, ok := in.R.BasicAuth()
