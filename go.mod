@@ -1,6 +1,6 @@
 module github.com/ybbus/httpmockserver
 
-go 1.20
+go 1.19
 
 require (
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible
