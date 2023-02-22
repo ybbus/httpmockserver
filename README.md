@@ -1,4 +1,5 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/ybbus/httpmockserver)](https://goreportcard.com/report/github.com/ybbus/httpmockserver)
+[![Go build](https://github.com/ybbus/httpmockserver/actions/workflows/go.yml/badge.svg)](https://github.com/ybbus/httpmockserver)
 [![Codecov](https://codecov.io/github/ybbus/httpmockserver/branch/master/graph/badge.svg?token=ARYOQ8R1DT)](https://codecov.io/github/ybbus/httpmockserver)
 [![GoDoc](https://godoc.org/github.com/ybbus/httpmockserver?status.svg)](https://godoc.org/github.com/ybbus/httpmockserver)
 [![GitHub license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
