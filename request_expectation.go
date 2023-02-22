@@ -143,6 +143,9 @@ type RequestExpectation interface {
 	// JSONPathContains expects a given request with a body containing a specific json value using jsonPath notation
 	// see: https://github.com/oliveagle/jsonpath
 	JSONPathContains(jsonPath string, value interface{}) RequestExpectation
+	// JSONPathMatches expects a given request with a body matching a regex of a value retrieved by jsonPath notation
+	// see: https://github.com/oliveagle/jsonpath
+	JSONPathMatches(jsonPath string, regex string) RequestExpectation
 
 	// BodyFunc expects a given request with a custom validation function
 	// you can use the provided body to do arbitrary validation
@@ -395,6 +398,10 @@ func (exp *requestExpectation) JSONBody(expected interface{}) RequestExpectation
 
 func (exp *requestExpectation) JSONPathContains(jsonPath string, value interface{}) RequestExpectation {
 	return exp.appendValidation(jsonPathContainsValidation(jsonPath, value), "JSONPathContains: "+jsonPath)
+}
+
+func (exp *requestExpectation) JSONPathMatches(jsonPath string, regex string) RequestExpectation {
+	return exp.appendValidation(jsonPathMatchesValidation(jsonPath, regex), "JSONPathMatches: "+jsonPath)
 }
 
 func (exp *requestExpectation) StringBody(body string) RequestExpectation {

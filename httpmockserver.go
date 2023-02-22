@@ -59,6 +59,8 @@ type MockServer interface {
 	// DEFAULT returns a RequestExpectation that will be executed if no other expectation matches
 	DEFAULT() RequestExpectation
 	// AssertExpectations should be called to check if all expectations have been met
+	// It also removes all expectations (except the default and every expectations).
+	// This let you reuse the same mock server for multiple tests.
 	AssertExpectations()
 	// Shutdown should be called to stop the mock server (should be deferred at the beginning of the test function)
 	Shutdown()
@@ -147,8 +149,8 @@ func NewWithOpts(t T, opts Opts) MockServer {
 }
 
 type mockServer struct {
-	server        *httptest.Server
-	finisheCalled bool
+	server       *httptest.Server
+	assertCalled bool
 
 	t T
 
@@ -285,7 +287,7 @@ func (s *mockServer) DEFAULT() RequestExpectation {
 
 func (s *mockServer) AssertExpectations() {
 	s.t.Helper()
-	s.finisheCalled = true
+	s.assertCalled = true
 	var buf bytes.Buffer
 
 	unsatisfied := false
@@ -320,10 +322,12 @@ func (s *mockServer) AssertExpectations() {
 		s.t.Fatalf("\nexpectation(s) not satisfied:\n%v", buf.String())
 		return
 	}
+
+	s.expectations = nil
 }
 
 func (s *mockServer) Shutdown() {
-	if !s.finisheCalled {
+	if !s.assertCalled {
 		s.t.Fatalf("AssertExpectations() was not called, no expectations were checked")
 		return
 	}
