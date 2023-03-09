@@ -3,7 +3,7 @@ module github.com/ybbus/httpmockserver
 go 1.19
 
 require (
-	github.com/form3tech-oss/jwt-go v3.2.5+incompatible
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/oliveagle/jsonpath v0.0.0-20180606110733-2e52cf6e6852
 	github.com/stretchr/testify v1.8.1
 )
