@@ -368,7 +368,7 @@ var (
 
 	methodValidation = func(method string) RequestValidationFunc {
 		return func(in *IncomingRequest) error {
-			if strings.EqualFold(in.R.Method, method) {
+			if !strings.EqualFold(in.R.Method, method) {
 				return fmt.Errorf("request validation failed: expected method %v but was %v", method, in.R.Method)
 			}
 
