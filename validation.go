@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/form3tech-oss/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/oliveagle/jsonpath"
 	"reflect"
 	"regexp"
@@ -37,7 +37,7 @@ var (
 	bodyValidation = func(data []byte) RequestValidationFunc {
 		return func(in *IncomingRequest) error {
 
-			if bytes.Compare(data, in.Body) != 0 {
+			if !bytes.Equal(data, in.Body) {
 				return fmt.Errorf("request validation failed: body should be %v but was %v", string(data), string(in.Body))
 			}
 
@@ -95,10 +95,10 @@ var (
 				return fmt.Errorf("request validation failed: could not parse actual json body %+v: %v", in.Body, err)
 			}
 
-			normStringActual, err := json.Marshal(normJsActual)
-			normStringExpected, err := json.Marshal(normJsExpected)
+			normStringActual, _ := json.Marshal(normJsActual)
+			normStringExpected, _ := json.Marshal(normJsExpected)
 
-			if bytes.Compare(normStringActual, normStringExpected) != 0 {
+			if !bytes.Equal(normStringActual, normStringExpected) {
 				return fmt.Errorf("request validation failed: json body should be %+v but was %+v", normStringExpected, normStringActual)
 			}
 
@@ -368,7 +368,7 @@ var (
 
 	methodValidation = func(method string) RequestValidationFunc {
 		return func(in *IncomingRequest) error {
-			if strings.ToLower(in.R.Method) != strings.ToLower(method) {
+			if strings.EqualFold(in.R.Method, method) {
 				return fmt.Errorf("request validation failed: expected method %v but was %v", method, in.R.Method)
 			}
 
